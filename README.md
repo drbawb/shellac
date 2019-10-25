@@ -25,7 +25,7 @@ The `lacca` and `resin` programs *do not* follow standard semantic versioning
 guideliens. Please read the following to understand how the project's versions
 are controlled. *The developer's suggest pinning both a major AND minor version*
 when using build tools which expect semantic versioning. i.e: pin to
-"~> 1.3.0" rather than "~> 1.3" in your build tool. This would allow the patch
+"\~> 1.3.0" rather than "\~> 1.3" in your build tool. This would allow the patch
 version to change, but not the major or minor version.
 
 The version number consits of `protocol`, `library`, and `patch` components.
