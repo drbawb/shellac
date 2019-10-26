@@ -87,24 +87,24 @@ defmodule Lacca.Protocol do
     end
 
     defp _write_packet(flags, payload) when is_binary(payload) do
-      payload_len = String.length(payload) + 1
-      << <<payload_len::16>>, flags >>  <> payload
+      << flags >>  <> payload
     end
 
     def write_handshake_req() do
-      <<0, 2, _encode_flags(handshake_req()), version()>> 
+      << _encode_flags(handshake_req()), version() >> 
     end
 
     def write_start_process(exec_name, args \\ []) do
       start_process_packet = %{
         "StartProcess" => %{
-          "executable" => exec_name,
-          "arguments"  => args
+          "exec" => exec_name,
+          "args" => args
         }
       }
 
 
-      packet_bin = CBOR.encode(start_process_packet)
+      # encode the payload and split it into wire packets
+      packet_bin  = CBOR.encode(start_process_packet)
       packet_list = BinUtils.chunk_binary(packet_bin, @max_payload_size)
                     |> _serialize_packets(start_process())
 
