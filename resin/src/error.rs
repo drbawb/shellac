@@ -8,6 +8,9 @@ pub enum InternalError {
 
 	#[fail(display = "fail serializing payload: {}", inner)]
 	SerializerError { inner: serde_cbor::error::Error },
+
+	#[fail(display = "unknown packet type: {}", ty)]
+	UnknownType { ty: u8 },
 }
 
 impl From<io::Error> for InternalError {
