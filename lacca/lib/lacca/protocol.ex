@@ -5,8 +5,8 @@ defmodule Lacca.Protocol do
   the protocol follows:
 
   - u16       packet length (i.e: read next `n` bytes)
-  - u8        packet flags & type
-  - [u8,...]  packet payload 
+  - u8        packet flags
+  - [u8,...]  packet payload (CBOR encoded)
 
   NOTE: if the high bit (0x80) of the packet flags are set this message
   is *incomplete* and the payload must be buffered by the receiver.
@@ -54,6 +54,13 @@ defmodule Lacca.Protocol do
 
 
   defmodule Encoder do
+    @moduledoc """
+    This module provides helpers to encode messages suitable for being
+    sent to a running a daemon which implements the `shellac` protocol.
+    This module assumes that such a daemon is operating on a `Port` which
+    has been started w/ the following options: `[:binary, {:packet, 2}]`.
+    """
+
     import Bitwise
     import Const
 
@@ -107,8 +114,6 @@ defmodule Lacca.Protocol do
       packet_bin  = CBOR.encode(start_process_packet)
       packet_list = BinUtils.chunk_binary(packet_bin, @max_payload_size)
                     |> _serialize_packets(start_process())
-
-
     end
   end
 
