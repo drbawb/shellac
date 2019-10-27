@@ -24,6 +24,32 @@ fn decode_packets(packets: Vec<Vec<u8>>) -> Result<PacketTy, InternalError> {
 	Ok(decoded_packet)
 }
 
+fn dispatch_packet(packet: PacketTy) -> Result<(), InternalError> {
+	// echo length to client
+	//stdout.write_u16::<NetworkEndian>(2)?;
+	//stdout.write_u16::<NetworkEndian>(packet_len)?;
+	//stdout.flush()?;
+	
+	match packet {
+		PacketTy::StartProcess { exec, args } => {
+			// spawn process          (supervisor thread)
+			// stdout handler thread  (read from process)
+			// stderr handler thread  (read from process)
+			// stdin handler thread   (read from erlang)
+			// packet handler thread  (collect messages from other threads)
+		},
+
+		_ => panic!("not yet implemented ..."),
+	}
+
+	Ok(())
+}
+
+
+fn dispatch_error(error: InternalError) -> Result<(), InternalError> {
+	Ok(())
+}
+
 fn main() -> Result<(), InternalError> {
 
 	let mut stdin = io::stdin();
@@ -36,10 +62,10 @@ fn main() -> Result<(), InternalError> {
 		let mut len_buf = [0u8; 2];
 		let size = stdin.read(&mut len_buf)?;
 
-		// well this is awkward, did they hang up?
+		// TODO: well this is awkward, did they hang up?
 		if size == 0 { break 'header }
 
-		// assert we actually read a u16, then process that many bytes
+		// assert we actually read a u16, then process `len` bytes
 		assert_eq!(len_buf.len(), size);
 		let packet_len = (&len_buf[..]).read_u16::<NetworkEndian>()?;
 		let mut packet = vec![0u8; packet_len as usize];
@@ -50,34 +76,14 @@ fn main() -> Result<(), InternalError> {
 		packet_chain.push(packet);
 		if !is_finished { continue 'header; }
 
+		// TODO: actually swap buffers here, instead of creating a new one?
 		// swap buffers and decode packet
-		let last_packets = std::mem::replace(&mut packet_chain, vec![]);
-		match decode_packets(last_packets) {
-			Ok(decoded_packet) => {
-				// echo length to client
-				stdout.write_u16::<NetworkEndian>(2)?;
-				stdout.write_u16::<NetworkEndian>(packet_len)?;
-				stdout.flush()?;
-
-				// handle client packets, i.e: stdin, start process, etc.
-				match decoded_packet {
-					PacketTy::StartProcess { exec, args } => {
-						eprintln!("start: {}, arg len: {}", exec, args.len());
-					},
-
-					_ => panic!("unexpected packet from client"),
-				};
-			},
-
-			// TODO: better error reporting to client
-			Err(err) => {
-				eprintln!("err handling client packet: {:?}", err);
-				// error: FOO
-				stdout.write_u16::<NetworkEndian>(2)?;
-				stdout.write_u16::<NetworkEndian>(0xCACA)?;
-				stdout.flush()?;
-			},
+		let last_packet_group = std::mem::replace(&mut packet_chain, vec![]);
+		match decode_packets(last_packet_group) {
+			Ok(decoded_packet) => dispatch_packet(decoded_packet)?,
+			Err(err) => dispatch_error(err)?,
 		}
+
 	}
 	
 	Ok(())
