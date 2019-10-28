@@ -52,7 +52,6 @@ defmodule Lacca.Protocol do
     end
   end
 
-
   defmodule Encoder do
     @moduledoc """
     This module provides helpers to encode messages suitable for being
