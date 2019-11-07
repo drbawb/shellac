@@ -100,6 +100,15 @@ defmodule Lacca.Protocol do
       << _encode_flags(handshake_req()), version() >> 
     end
 
+    def write_data_packet(data) when is_binary(data) do
+      data_packet = %{"DataIn" => %{"buf" => :erlang.binary_to_list(data)}}
+
+      # encode the payload and split it into wire packets
+      packet_bin  = CBOR.encode(data_packet)
+      packet_list = BinUtils.chunk_binary(packet_bin, @max_payload_size)
+                    |> _serialize_packets(start_process())
+    end
+
     def write_start_process(exec_name, args \\ []) do
       start_process_packet = %{
         "StartProcess" => %{

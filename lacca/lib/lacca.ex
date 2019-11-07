@@ -143,8 +143,13 @@ defmodule Lacca do
     {:reply, {:ok, buf}, state}
   end
 
-  def handle_call({:send, data}, _from, state = %{port: port}) when not is_nil(port) do
-    Port.command(port, data)
+  def handle_call({:write, data}, _from, state = %{port: port}) when not is_nil(port) do
+    Encoder.write_data_packet(data)
+    |> Enum.map(fn packet ->
+      Logger.debug "sending packet: #{inspect packet}"
+      Port.command(port, packet)
+    end)
+
     {:reply, :ok, state}
   end
 
