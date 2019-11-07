@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::io::{self, Read, Write};
 use std::thread;
 use std::process::{Command, Stdio};
-use std::sync::mpsc::{channel, Sender, Receiver};
+use std::sync::mpsc::{channel, Sender};
 
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize)]
@@ -74,13 +74,10 @@ fn dispatch_packet(packet: PacketTy) -> Result<(), InternalError> {
 
 			let mut erlang_port = io::stdout();
 
-			let mut stdin = child.stdin.take()
-				.expect ("stdin handle not opened?");
-
-			let mut stdout = child.stdout.take()
+			let stdout = child.stdout.take()
 				.expect("stdout handle not opened?");
 
-			let mut stderr = child.stderr.take()
+			let stderr = child.stderr.take()
 				.expect("stderr handle not opened?");
 
 			let (outbox_tx, outbox_rx) = channel();
@@ -89,22 +86,22 @@ fn dispatch_packet(packet: PacketTy) -> Result<(), InternalError> {
 			let stderr_tx = outbox_tx.clone();
 			let status_tx = outbox_tx.clone();
 
-			let stdout_thread = thread::spawn(move || {
+			let _stdout_thread = thread::spawn(move || {
 				handle_output(StreamTy::Stdout, stdout, stdout_tx)
 			});
 
-			let stderr_thread = thread::spawn(move || {
+			let _stderr_thread = thread::spawn(move || {
 				handle_output(StreamTy::Stderr, stderr, stderr_tx)
 			});
 
-			let status_thread: thread::JoinHandle<Result<(), InternalError>> = thread::spawn(move || {
+			let _status_thread: thread::JoinHandle<Result<(), InternalError>> = thread::spawn(move || {
 				let status_code = child.wait()?;
 				status_tx.send(PacketTy::ExitStatus { code: status_code.code() });
 				Ok(())
 			});
 
 
-			let outgoing_thread: thread::JoinHandle<Result<(), InternalError>> = thread::spawn(move || {
+			let _outgoing_thread: thread::JoinHandle<Result<(), InternalError>> = thread::spawn(move || {
 				loop {
 					match outbox_rx.recv() {
 						Ok(packet) => {
@@ -114,7 +111,7 @@ fn dispatch_packet(packet: PacketTy) -> Result<(), InternalError> {
 							erlang_port.flush()?;
 						},
 
-						Err(msg) => break, 
+						Err(_msg) => break, 
 					}
 				}
 
@@ -135,7 +132,7 @@ fn handle_output<R: Read>(stream_ty: StreamTy, mut stream: R, outbox: Sender<Pac
 	'stdout: loop {
 		let mut buf = [0u8; 1024];
 		let len = stream.read(&mut buf)?;
-		if (len == 0) { break 'stdout }
+		if len == 0 { break 'stdout }
 
 		let packet = PacketTy::DataOut { 
 			ty: stream_ty,
@@ -149,14 +146,13 @@ fn handle_output<R: Read>(stream_ty: StreamTy, mut stream: R, outbox: Sender<Pac
 	Ok(())
 }
 
-fn dispatch_error(error: InternalError) -> Result<(), InternalError> {
+fn dispatch_error(_error: InternalError) -> Result<(), InternalError> {
 	Ok(())
 }
 
 fn main() -> Result<(), InternalError> {
 
 	let mut stdin = io::stdin();
-	let mut stdout = io::stdout();
 
 	let mut packet_chain = vec![];
 
