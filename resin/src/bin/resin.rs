@@ -1,9 +1,9 @@
 use byteorder::{ReadBytesExt, WriteBytesExt, NetworkEndian};
 use resin::error::InternalError;
 use serde::{Deserialize, Serialize};
-use std::io::{self, Read, Write};
+use std::io::{self, Cursor, Read, Write};
 use std::thread;
-use std::process::{Command, Stdio};
+use std::process::{ChildStdin, Command, Stdio};
 use std::sync::mpsc::{channel, Sender};
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize)]
@@ -52,6 +52,7 @@ enum ServerState {
 #[derive(Debug)]
 struct ResinServer {
 	state: ServerState,
+	child_stdin: Option<ChildStdin>,
 }
 
 impl ResinServer {
@@ -59,6 +60,7 @@ impl ResinServer {
 	pub fn new() -> Self {
 		ResinServer {
 			state: ServerState::NotStarted,
+			child_stdin: None,
 		}
 	}
 
@@ -86,7 +88,9 @@ impl ResinServer {
 					.spawn()?;
 
 
-				let mut erlang_port = io::stdout();
+
+				// pull out i/o for splitting into threads
+				self.child_stdin = child.stdin.take();
 
 				let stdout = child.stdout.take()
 					.expect("stdout handle not opened?");
@@ -94,12 +98,14 @@ impl ResinServer {
 				let stderr = child.stderr.take()
 					.expect("stderr handle not opened?");
 
+				// set up message passing for threads
 				let (outbox_tx, outbox_rx) = channel();
 
 				let stdout_tx = outbox_tx.clone();
 				let stderr_tx = outbox_tx.clone();
 				let status_tx = outbox_tx.clone();
 
+				// start i/o worker threads
 				let _stdout_thread = thread::spawn(move || {
 					handle_output(StreamTy::Stdout, stdout, stdout_tx)
 				});
@@ -111,11 +117,15 @@ impl ResinServer {
 				let _status_thread: thread::JoinHandle<Result<(), InternalError>> = thread::spawn(move || {
 					let status_code = child.wait()?;
 					status_tx.send(PacketTy::ExitStatus { code: status_code.code() });
-					Ok(())
+
+					// TODO: cleanup exit code
+					std::process::exit(0);
 				});
 
 
 				let _outgoing_thread: thread::JoinHandle<Result<(), InternalError>> = thread::spawn(move || {
+					let mut erlang_port = io::stdout();
+
 					loop {
 						match outbox_rx.recv() {
 							Ok(packet) => {
@@ -134,6 +144,7 @@ impl ResinServer {
 
 				// transition to running state
 				self.state = ServerState::Started;
+
 				Ok(())
 			},
 
@@ -143,7 +154,14 @@ impl ResinServer {
 
 	fn dispatch_running(&mut self, packet: PacketTy) -> Result<(), InternalError> {
 		match packet {
-			PacketTy::DataIn { buf } => { Ok(()) },
+			PacketTy::DataIn { mut buf } => {
+				if let Some(ref mut fd) = self.child_stdin {
+					let mut cursor = Cursor::new(&mut buf);
+					io::copy(&mut cursor, fd)?;
+				}
+
+				Ok(())
+			},
 
 			msg => panic!("illegal packet {:?} for state {:?}", msg, self.state),
 		}
@@ -200,12 +218,9 @@ fn handle_output<R: Read>(stream_ty: StreamTy, mut stream: R, outbox: Sender<Pac
 
 
 fn main() -> Result<(), InternalError> {
-
 	let mut stdin = io::stdin();
 	let mut packet_chain = vec![];
-
 	let mut server = ResinServer::new();
-
 
 	'header: loop {
 		// read packet size (first u16 on wire)
