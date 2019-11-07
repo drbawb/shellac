@@ -2,14 +2,43 @@ use byteorder::{ReadBytesExt, WriteBytesExt, NetworkEndian};
 use resin::error::InternalError;
 use serde::{Deserialize, Serialize};
 use std::io::{self, Read, Write};
+use std::thread;
+use std::process::{Command, Stdio};
+use std::sync::mpsc::{channel, Sender, Receiver};
+
+
+#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
+pub enum StreamTy {
+	Stdout,
+	Stderr,
+}
+
 
 #[derive(Debug, Deserialize, Serialize)]
-enum PacketTy {
+pub enum PacketTy {
+	/// Sent by a `shellac` client to request that the daemon starts
+	/// the named executable. If this daemon is already running an
+	/// executable: this command will be ignored and an error code
+	/// will be returned to the client.
 	StartProcess { exec: String, args: Vec<String> },
 
-	DataStdin { buf: Vec<u8> },
-	DataStdout { buf: Vec<u8> },
+	/// Data to be sent to a `shellac` client representing data
+	/// received from the child's output descriptor(s).
+	DataOut { ty: StreamTy, buf: Vec<u8> },
 
+
+	/// Data received from a `shellac` client representing data
+	/// which needs to be sent to the child program on its standard
+	/// input descriptor.
+	DataIn { buf: Vec<u8> },
+
+	/// Indicates to a `shellac` client that the daemon will exit
+	/// because the child has hung-up & returned an exit status.
+	///
+	/// NOTE: an exit status is not available on all platforms in
+	/// all instances of abnormal termination. The `shellac` client
+	/// must be able to handle the absence of an exit code.
+	ExitStatus { code: Option<i32> },
 }
 
 fn decode_packets(packets: Vec<Vec<u8>>) -> Result<PacketTy, InternalError> {
@@ -32,11 +61,67 @@ fn dispatch_packet(packet: PacketTy) -> Result<(), InternalError> {
 	
 	match packet {
 		PacketTy::StartProcess { exec, args } => {
-			// spawn process          (supervisor thread)
-			// stdout handler thread  (read from process)
-			// stderr handler thread  (read from process)
-			// stdin handler thread   (read from erlang)
-			// packet handler thread  (collect messages from other threads)
+			// set up command per specs from client
+			let mut child = Command::new(exec);
+			for arg in args { child.arg(arg); }
+
+			// setup input / output for use w/ daemon
+			let mut child = child.stdin(Stdio::piped())
+				.stdout(Stdio::piped())
+				.stderr(Stdio::piped())
+				.spawn()?;
+
+
+			let mut erlang_port = io::stdout();
+
+			let mut stdin = child.stdin.take()
+				.expect ("stdin handle not opened?");
+
+			let mut stdout = child.stdout.take()
+				.expect("stdout handle not opened?");
+
+			let mut stderr = child.stderr.take()
+				.expect("stderr handle not opened?");
+
+			let (outbox_tx, outbox_rx) = channel();
+
+			let stdout_tx = outbox_tx.clone();
+			let stderr_tx = outbox_tx.clone();
+			let status_tx = outbox_tx.clone();
+
+			let stdout_thread = thread::spawn(move || {
+				handle_output(StreamTy::Stdout, stdout, stdout_tx)
+			});
+
+			let stderr_thread = thread::spawn(move || {
+				handle_output(StreamTy::Stderr, stderr, stderr_tx)
+			});
+
+			let status_thread: thread::JoinHandle<Result<(), InternalError>> = thread::spawn(move || {
+				let status_code = child.wait()?;
+				status_tx.send(PacketTy::ExitStatus { code: status_code.code() });
+				Ok(())
+			});
+
+
+			let outgoing_thread: thread::JoinHandle<Result<(), InternalError>> = thread::spawn(move || {
+				loop {
+					match outbox_rx.recv() {
+						Ok(packet) => {
+							let buf = serde_cbor::to_vec(&packet)?;
+							erlang_port.write_u16::<NetworkEndian>(buf.len() as u16)?;
+							erlang_port.write(&buf)?;
+							erlang_port.flush()?;
+						},
+
+						Err(msg) => break, 
+					}
+				}
+
+				Ok(())
+			});
+
+
 		},
 
 		_ => panic!("not yet implemented ..."),
@@ -45,6 +130,24 @@ fn dispatch_packet(packet: PacketTy) -> Result<(), InternalError> {
 	Ok(())
 }
 
+
+fn handle_output<R: Read>(stream_ty: StreamTy, mut stream: R, outbox: Sender<PacketTy>) -> Result<(), InternalError> {
+	'stdout: loop {
+		let mut buf = [0u8; 1024];
+		let len = stream.read(&mut buf)?;
+		if (len == 0) { break 'stdout }
+
+		let packet = PacketTy::DataOut { 
+			ty: stream_ty,
+			buf: buf[0..len].to_vec() 
+		};
+
+		// TODO: log failure 
+		if let Err(_msg) = outbox.send(packet) { break 'stdout }
+	}
+
+	Ok(())
+}
 
 fn dispatch_error(error: InternalError) -> Result<(), InternalError> {
 	Ok(())
