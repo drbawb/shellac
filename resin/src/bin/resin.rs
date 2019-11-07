@@ -6,13 +6,11 @@ use std::thread;
 use std::process::{Command, Stdio};
 use std::sync::mpsc::{channel, Sender};
 
-
 #[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 pub enum StreamTy {
 	Stdout,
 	Stderr,
 }
-
 
 #[derive(Debug, Deserialize, Serialize)]
 pub enum PacketTy {
@@ -39,7 +37,136 @@ pub enum PacketTy {
 	/// all instances of abnormal termination. The `shellac` client
 	/// must be able to handle the absence of an exit code.
 	ExitStatus { code: Option<i32> },
+
+	/// The daemon has encountered a non-fatal error.
+	ErrorReport { msg: String },
 }
+
+
+#[derive(Debug)]
+enum ServerState {
+	NotStarted,
+	Started,
+}
+
+#[derive(Debug)]
+struct ResinServer {
+	state: ServerState,
+}
+
+impl ResinServer {
+
+	pub fn new() -> Self {
+		ResinServer {
+			state: ServerState::NotStarted,
+		}
+	}
+
+	fn dispatch_packet(&mut self, packet: PacketTy) -> Result<(), InternalError> {
+		match self.state {
+			ServerState::NotStarted => self.dispatch_not_running(packet)?,
+			ServerState::Started => self.dispatch_running(packet)?,
+		}
+
+		Ok(())
+	}
+
+
+	fn dispatch_not_running(&mut self, packet: PacketTy) -> Result<(), InternalError> {
+		match packet {
+			PacketTy::StartProcess { exec, args } => {
+				// set up command per specs from client
+				let mut child = Command::new(exec);
+				for arg in args { child.arg(arg); }
+
+				// setup input / output for use w/ daemon
+				let mut child = child.stdin(Stdio::piped())
+					.stdout(Stdio::piped())
+					.stderr(Stdio::piped())
+					.spawn()?;
+
+
+				let mut erlang_port = io::stdout();
+
+				let stdout = child.stdout.take()
+					.expect("stdout handle not opened?");
+
+				let stderr = child.stderr.take()
+					.expect("stderr handle not opened?");
+
+				let (outbox_tx, outbox_rx) = channel();
+
+				let stdout_tx = outbox_tx.clone();
+				let stderr_tx = outbox_tx.clone();
+				let status_tx = outbox_tx.clone();
+
+				let _stdout_thread = thread::spawn(move || {
+					handle_output(StreamTy::Stdout, stdout, stdout_tx)
+				});
+
+				let _stderr_thread = thread::spawn(move || {
+					handle_output(StreamTy::Stderr, stderr, stderr_tx)
+				});
+
+				let _status_thread: thread::JoinHandle<Result<(), InternalError>> = thread::spawn(move || {
+					let status_code = child.wait()?;
+					status_tx.send(PacketTy::ExitStatus { code: status_code.code() });
+					Ok(())
+				});
+
+
+				let _outgoing_thread: thread::JoinHandle<Result<(), InternalError>> = thread::spawn(move || {
+					loop {
+						match outbox_rx.recv() {
+							Ok(packet) => {
+								let buf = serde_cbor::to_vec(&packet)?;
+								erlang_port.write_u16::<NetworkEndian>(buf.len() as u16)?;
+								erlang_port.write(&buf)?;
+								erlang_port.flush()?;
+							},
+
+							Err(_msg) => break, 
+						}
+					}
+
+					Ok(())
+				});
+
+				// transition to running state
+				self.state = ServerState::Started;
+				Ok(())
+			},
+
+			msg => panic!("illegal packet {:?} for state {:?}", msg, self.state),
+		}
+	}
+
+	fn dispatch_running(&mut self, packet: PacketTy) -> Result<(), InternalError> {
+		match packet {
+			PacketTy::DataIn { buf } => { Ok(()) },
+
+			msg => panic!("illegal packet {:?} for state {:?}", msg, self.state),
+		}
+	}
+
+
+
+	fn dispatch_error(&mut self, error: InternalError) -> Result<(), InternalError> {
+		let packet = PacketTy::ErrorReport {
+			msg: format!("resin daemon error: {}", error)
+		};
+
+		let buf = serde_cbor::to_vec(&packet)?;
+		
+		let mut erlang_port = io::stdout();
+		erlang_port.write_u16::<NetworkEndian>(buf.len() as u16)?;
+		erlang_port.write(&buf)?;
+		erlang_port.flush()?;
+
+		Ok(())
+	}
+}
+
 
 fn decode_packets(packets: Vec<Vec<u8>>) -> Result<PacketTy, InternalError> {
 	let complete_buf = packets
@@ -52,81 +179,6 @@ fn decode_packets(packets: Vec<Vec<u8>>) -> Result<PacketTy, InternalError> {
 
 	Ok(decoded_packet)
 }
-
-fn dispatch_packet(packet: PacketTy) -> Result<(), InternalError> {
-	// echo length to client
-	//stdout.write_u16::<NetworkEndian>(2)?;
-	//stdout.write_u16::<NetworkEndian>(packet_len)?;
-	//stdout.flush()?;
-	
-	match packet {
-		PacketTy::StartProcess { exec, args } => {
-			// set up command per specs from client
-			let mut child = Command::new(exec);
-			for arg in args { child.arg(arg); }
-
-			// setup input / output for use w/ daemon
-			let mut child = child.stdin(Stdio::piped())
-				.stdout(Stdio::piped())
-				.stderr(Stdio::piped())
-				.spawn()?;
-
-
-			let mut erlang_port = io::stdout();
-
-			let stdout = child.stdout.take()
-				.expect("stdout handle not opened?");
-
-			let stderr = child.stderr.take()
-				.expect("stderr handle not opened?");
-
-			let (outbox_tx, outbox_rx) = channel();
-
-			let stdout_tx = outbox_tx.clone();
-			let stderr_tx = outbox_tx.clone();
-			let status_tx = outbox_tx.clone();
-
-			let _stdout_thread = thread::spawn(move || {
-				handle_output(StreamTy::Stdout, stdout, stdout_tx)
-			});
-
-			let _stderr_thread = thread::spawn(move || {
-				handle_output(StreamTy::Stderr, stderr, stderr_tx)
-			});
-
-			let _status_thread: thread::JoinHandle<Result<(), InternalError>> = thread::spawn(move || {
-				let status_code = child.wait()?;
-				status_tx.send(PacketTy::ExitStatus { code: status_code.code() });
-				Ok(())
-			});
-
-
-			let _outgoing_thread: thread::JoinHandle<Result<(), InternalError>> = thread::spawn(move || {
-				loop {
-					match outbox_rx.recv() {
-						Ok(packet) => {
-							let buf = serde_cbor::to_vec(&packet)?;
-							erlang_port.write_u16::<NetworkEndian>(buf.len() as u16)?;
-							erlang_port.write(&buf)?;
-							erlang_port.flush()?;
-						},
-
-						Err(_msg) => break, 
-					}
-				}
-
-				Ok(())
-			});
-
-
-		},
-
-		_ => panic!("not yet implemented ..."),
-	}
-
-	Ok(())
-}
-
 
 fn handle_output<R: Read>(stream_ty: StreamTy, mut stream: R, outbox: Sender<PacketTy>) -> Result<(), InternalError> {
 	'stdout: loop {
@@ -146,15 +198,14 @@ fn handle_output<R: Read>(stream_ty: StreamTy, mut stream: R, outbox: Sender<Pac
 	Ok(())
 }
 
-fn dispatch_error(_error: InternalError) -> Result<(), InternalError> {
-	Ok(())
-}
 
 fn main() -> Result<(), InternalError> {
 
 	let mut stdin = io::stdin();
-
 	let mut packet_chain = vec![];
+
+	let mut server = ResinServer::new();
+
 
 	'header: loop {
 		// read packet size (first u16 on wire)
@@ -178,11 +229,16 @@ fn main() -> Result<(), InternalError> {
 		// TODO: actually swap buffers here, instead of creating a new one?
 		// swap buffers and decode packet
 		let last_packet_group = std::mem::replace(&mut packet_chain, vec![]);
-		match decode_packets(last_packet_group) {
-			Ok(decoded_packet) => dispatch_packet(decoded_packet)?,
-			Err(err) => dispatch_error(err)?,
-		}
+		let dispatch_result = match decode_packets(last_packet_group) {
+			Ok(decoded_packet) => server.dispatch_packet(decoded_packet),
+			Err(err) => server.dispatch_error(err),
+		};
 
+		if let Err(err) = dispatch_result {
+			server
+				.dispatch_error(err)
+				.expect("error dispatching error; terminating on account of double fault.");
+		}
 	}
 	
 	Ok(())
