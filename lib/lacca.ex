@@ -111,7 +111,7 @@ defmodule Lacca do
       raise ArgumentError, "expected opts[:args] to be a list of arguments"
     end
 
-    resin_daemon = Applicaiton.app_dir(:lacca, "priv/resin/resind")
+    resin_daemon = Application.app_dir(:lacca, "priv/resin/resind")
 
     unless File.exists? resin_daemon do
       raise RuntimeError, "Could not locate `resind` daemon at: #{resin_daemon}"
