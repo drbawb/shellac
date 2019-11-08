@@ -8,7 +8,8 @@ defmodule Lacca.MixProject do
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      compilers: [:cargo] ++ Mix.compilers(),
+      compilers: [:elixir_make] ++ Mix.compilers(),
+      package: package(),
     ]
   end
 
@@ -24,6 +25,21 @@ defmodule Lacca.MixProject do
     [
       {:cbor, "~> 1.0"},
       {:dialyxir, "~> 1.0.0-rc.7", only: [:dev], runtime: false},
+      {:elixir_make, "~> 0.4", runtime: false},
+    ]
+  end
+
+  defp package do
+    [
+      description: "Library to manage OS processes from the Elixir runtime.",
+
+      files: [
+        "lib", "mix.exs", "README*", "LICENSE*", "Makefile",
+        "resin/*.toml", "resin/*.lock", "resin/src/*"
+      ],
+
+      licenses: ["BSD"],
+      links: %{"GitHub" => "https://github.com/drbawb/shellac"},
     ]
   end
 end
