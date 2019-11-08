@@ -82,7 +82,7 @@ defmodule Lacca do
   Use `await/1` if you wish to block on the child process actually terminating.
   """
   def stop_child(pid) do
-
+    {:error, :not_implemented}
   end
 
   @doc """
@@ -93,7 +93,7 @@ defmodule Lacca do
   When this function returns `pid` will have exited.
   """
   def await(pid) do
-
+    {:error, :not_implemented}
   end
 
   #
