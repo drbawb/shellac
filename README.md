@@ -9,7 +9,7 @@ sub-projects which coordinate to accomplish this goal:
 
 - `resin`: a Rust binary which acts as a companion to the `lacca`
   OTP application. This binary provides process control and 
-  supervision, it also multiplexes the processes open file descriptors
+  supervision, it also multiplexes the process's open file descriptors
   onto the single BEAM port.
 
 
@@ -103,8 +103,7 @@ following initialization sequence:
 - resin: signal handling architecture
   - need more generalized support for sending processes different kinds of
     signals, not just calling `Child::kill()`
-
-- lacca: handle DataOut packet types
+  - wtf do we do on Windows land?
 
 - resin: restructure as state machine?
   - there are bits of the server process state which don't exist until the
@@ -112,7 +111,15 @@ following initialization sequence:
     type system as some kind of FSM so I can stop unwrapping Option<..>
     everywhere.
 
-- multi proc support
+- resin: multi proc support
   - Should one daemon be able to handle multiple inferior processes?
     I think this is what `erlexec` does but I'm not sure.
+
+- lacca: explore stdout/stderr space
+  - with streams how do we signal EOF?
+  - what if user wants to stream by line?
+  - should we send messages to interested processes instead of a
+    buffer that is read-once? (`flush()` destroys the contents of the
+    buffer...)
+
 
