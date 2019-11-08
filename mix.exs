@@ -10,6 +10,15 @@ defmodule Lacca.MixProject do
       deps: deps(),
       compilers: [:elixir_make] ++ Mix.compilers(),
       package: package(),
+
+      # ex_doc config
+      name: "Lacca",
+      source_url: "https://github.com/drbawb/shellac",
+      docs: [
+        main: "Lacca",
+        extras: ["README.md"],
+      ],
+
     ]
   end
 
@@ -26,6 +35,7 @@ defmodule Lacca.MixProject do
       {:cbor, "~> 1.0"},
       {:dialyxir, "~> 1.0.0-rc.7", only: [:dev], runtime: false},
       {:elixir_make, "~> 0.4", runtime: false},
+      {:ex_doc, "~> 0.19.0", only: :dev, runtime: :false},
     ]
   end
 
