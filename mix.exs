@@ -44,7 +44,7 @@ defmodule Lacca.MixProject do
       description: "Library to manage OS processes from the Elixir runtime.",
 
       files: [
-        "lib", "mix.exs", "README*", "LICENSE*", "Makefile",
+        "lib", "mix.exs", "README*", "LICENSE*", "CHANGELOG*", "Makefile",
         "resin/*.toml", "resin/*.lock", "resin/src/*"
       ],
 
