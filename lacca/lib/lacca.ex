@@ -183,10 +183,10 @@ defmodule Lacca do
     decoded_data = CBOR.decode(data)
 
     case decoded_data do
-      {:ok, %{"DataStdout" => %{"buf" => buf }}, _} ->
+      {:ok, %{"DataOut" => %{"ty" => "Stdout", "buf" => buf }}, _} ->
         IO.write(state.child_out, buf)
 
-      {:ok, %{"DataStderr" => %{"buf" => buf}}, _} ->
+      {:ok, %{"DataOut" => %{"ty" => "Stderr", "buf" => buf}}, _} ->
         IO.write(state.child_err, buf)
 
       packet ->
@@ -211,4 +211,5 @@ defmodule Lacca do
       Port.command(port, packet)
     end)
   end
+
 end
