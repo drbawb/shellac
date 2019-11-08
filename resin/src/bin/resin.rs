@@ -1,10 +1,11 @@
 use byteorder::{ReadBytesExt, WriteBytesExt, NetworkEndian};
 use resin::error::InternalError;
 use serde::{Deserialize, Serialize};
+use signal_hook::{iterator::Signals, SIGINT};
 use std::io::{self, Cursor, Read, Write};
 use std::thread;
 use std::process::{ChildStdin, Command, Stdio};
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::{channel, Sender, Receiver};
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 pub enum StreamTy {
@@ -19,6 +20,10 @@ pub enum PacketTy {
 	/// executable: this command will be ignored and an error code
 	/// will be returned to the client.
 	StartProcess { exec: String, args: Vec<String> },
+
+	/// Sent by a `shellac` client to request that the daemon stops
+	/// the child process immediately.
+	KillProcess,
 
 	/// Data to be sent to a `shellac` client representing data
 	/// received from the child's output descriptor(s).
@@ -53,14 +58,20 @@ enum ServerState {
 struct ResinServer {
 	state: ServerState,
 	child_stdin: Option<ChildStdin>,
+	exit_tx: Option<Sender<()>>,
+	exit_rx: Option<Receiver<()>>,
 }
 
 impl ResinServer {
 
 	pub fn new() -> Self {
+		let (exit_tx, exit_rx) = channel();
+
 		ResinServer {
 			state: ServerState::NotStarted,
 			child_stdin: None,
+			exit_tx: Some(exit_tx),
+			exit_rx: Some(exit_rx),
 		}
 	}
 
@@ -92,6 +103,7 @@ impl ResinServer {
 				// pull out i/o for splitting into threads
 				self.child_stdin = child.stdin.take();
 
+
 				let stdout = child.stdout.take()
 					.expect("stdout handle not opened?");
 
@@ -105,6 +117,7 @@ impl ResinServer {
 				let stderr_tx = outbox_tx.clone();
 				let status_tx = outbox_tx.clone();
 
+
 				// start i/o worker threads
 				let _stdout_thread = thread::spawn(move || {
 					handle_output(StreamTy::Stdout, stdout, stdout_tx)
@@ -114,12 +127,29 @@ impl ResinServer {
 					handle_output(StreamTy::Stderr, stderr, stderr_tx)
 				});
 
+				let exit_rx = self.exit_rx.take().unwrap();
 				let _status_thread: thread::JoinHandle<Result<(), InternalError>> = thread::spawn(move || {
-					let status_code = child.wait()?;
-					status_tx.send(PacketTy::ExitStatus { code: status_code.code() });
+					loop {
+						match exit_rx.try_recv() {
+							Ok(_)  => child.kill()?,
+							Err(_) => {},
+						};
 
-					// TODO: cleanup exit code
-					std::process::exit(0);
+						match child.try_wait() {
+							Ok(Some(status_code)) => {
+								status_tx.send(PacketTy::ExitStatus { code: status_code.code() });
+								std::process::exit(0);
+							},
+
+							Ok(None) | Err(_) => {},
+						}
+
+						// TODO: how long to wait here?
+						// TODO: don't use sleep_ms
+						std::thread::sleep_ms(100);
+					}
+
+					Ok(())
 				});
 
 
@@ -160,6 +190,11 @@ impl ResinServer {
 					io::copy(&mut cursor, fd)?;
 				}
 
+				Ok(())
+			},
+
+			PacketTy::KillProcess => {
+				if let Some(tx) = &self.exit_tx { tx.send(()); }
 				Ok(())
 			},
 
@@ -222,6 +257,11 @@ fn main() -> Result<(), InternalError> {
 	let mut packet_chain = vec![];
 	let mut server = ResinServer::new();
 
+	let exit_tx = server.exit_tx
+		.clone()
+		.take()
+		.expect("could not acquire exit channel");
+
 	'header: loop {
 		// read packet size (first u16 on wire)
 		let mut len_buf = [0u8; 2];
@@ -255,7 +295,10 @@ fn main() -> Result<(), InternalError> {
 				.expect("error dispatching error; terminating on account of double fault.");
 		}
 	}
-	
+
+	// stdin hungup, let's leave ...
+	exit_tx.send(());
+	thread::sleep_ms(1000);
 	Ok(())
 }
 

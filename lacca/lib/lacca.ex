@@ -32,6 +32,15 @@ defmodule Lacca do
     GenServer.start_link(__MODULE__, [path: exec_path, args: args])
   end
 
+  @doc """
+  Attempts to terminate the process immediately. Caller should expect that
+  the process will not be gracefully terminated; similarly to calling SIGKILL
+  on a POSIX operating system.
+  """
+  def kill(pid) do
+    GenServer.call(pid, :kill)
+  end
+
 
   @doc """
   Returns `{:ok, binary}` which includes any data received from the
@@ -153,6 +162,16 @@ defmodule Lacca do
     {:reply, :ok, state}
   end
 
+  def handle_call(:kill, _from, state = %{port: port}) when not is_nil(port) do
+    Encoder.write_exit_packet()
+    |> Enum.map(fn packet ->
+      Logger.debug "sending packet: #{inspect packet}"
+      Port.command(port, packet)
+    end)
+
+    {:reply, :ok, state}
+  end
+
   # `resin` daemon exited, RIP us...
   def handle_info({port, {:exit_status, status}}, state) when is_port(port) do
     Logger.info "got exit: #{inspect status}"
@@ -177,10 +196,19 @@ defmodule Lacca do
     {:noreply, state}
   end
 
+
   def handle_info({:DOWN, ref, :port, port, reason}, state) when is_port(port) do
     Logger.info "port going down: #{inspect port}"
     Logger.info "got message of port leaving: #{inspect reason}"
     Logger.info "port info: #{inspect Port.info(port)}"
     {:noreply, state}
+  end
+
+  def terminate(_reason, state = %{port: port}) when is_port(port) do
+    Encoder.write_exit_packet()
+    |> Enum.map(fn packet ->
+      Logger.debug "sending packet: #{inspect packet}"
+      Port.command(port, packet)
+    end)
   end
 end

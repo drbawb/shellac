@@ -109,6 +109,15 @@ defmodule Lacca.Protocol do
                     |> _serialize_packets(start_process())
     end
 
+    def write_exit_packet() do
+      data_packet = %{"KillProcess" => nil}
+
+      # encode the payload and split it into wire packets
+      packet_bin  = CBOR.encode(data_packet)
+      packet_list = BinUtils.chunk_binary(packet_bin, @max_payload_size)
+                    |> _serialize_packets(start_process())
+    end
+
     def write_start_process(exec_name, args \\ []) do
       start_process_packet = %{
         "StartProcess" => %{
