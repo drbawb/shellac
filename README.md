@@ -122,4 +122,6 @@ following initialization sequence:
     buffer that is read-once? (`flush()` destroys the contents of the
     buffer...)
 
+- packaging (hex.pm): how do we distribute both halves effectively?
+  distribute source and call `cargo` from Mix?
 

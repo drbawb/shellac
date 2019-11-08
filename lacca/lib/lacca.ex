@@ -3,9 +3,6 @@ defmodule Lacca do
   alias Lacca.Protocol.Encoder
   require Logger
 
-  # TODO: read from config / PATH / etc...
-  @resin_daemon "../resin/target/debug/resin"
-
   #
   # API
   #
@@ -114,8 +111,14 @@ defmodule Lacca do
       raise ArgumentError, "expected opts[:args] to be a list of arguments"
     end
 
+    resin_daemon = Applicaiton.app_dir(:lacca, "priv/resin/resind")
+
+    unless File.exists? resin_daemon do
+      raise RuntimeError, "Could not locate `resind` daemon at: #{resin_daemon}"
+    end
+
     # open the port to `resin` daemon
-    port  = Port.open({:spawn, @resin_daemon}, [:binary, :exit_status, {:packet, 2}])
+    port  = Port.open({:spawn, resin_daemon}, [:binary, :exit_status, {:packet, 2}])
     p_ref = Port.monitor(port)
 
     # TODO: negotiate protocol verison
