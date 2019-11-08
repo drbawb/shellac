@@ -7,12 +7,18 @@ use std::thread;
 use std::process::{ChildStdin, Command, Stdio};
 use std::sync::mpsc::{channel, Sender, Receiver};
 
+/// StreamTy represents which standard file-descriptor a data packet
+/// was read from. This is necessary to multiplex multiple descriptors
+/// onto the single stream available for sending data back to the Erlang VM.
 #[derive(Copy, Clone, Debug, Deserialize, Serialize)]
 pub enum StreamTy {
 	Stdout,
 	Stderr,
 }
 
+/// PacketTy represents the valid list of data which is expected to be
+/// exchanged over the Erlang VM port. This data will be CBOR encoded
+/// on the wire.
 #[derive(Debug, Deserialize, Serialize)]
 pub enum PacketTy {
 	/// Sent by a `shellac` client to request that the daemon starts
@@ -221,6 +227,13 @@ impl ResinServer {
 }
 
 
+/// Takes a list of *one or more* wire-format packets and transforms them into
+/// a higher-level application packet. It is assumed that all packets, except the
+/// final packet, have their continuation bit set; furthermore each packet in the
+/// list should be of the same type.
+///
+/// Mixing data from multiple packets will result in a failure during decoding.
+///
 fn decode_packets(packets: Vec<Vec<u8>>) -> Result<PacketTy, InternalError> {
 	let complete_buf = packets
 		.iter()
@@ -233,6 +246,13 @@ fn decode_packets(packets: Vec<Vec<u8>>) -> Result<PacketTy, InternalError> {
 	Ok(decoded_packet)
 }
 
+/// This loop takes a stream and type descriptor, it reads data from the
+/// stream into a fixed-length buffer and transforms it into application
+/// packets which are sent to the outgoing packet queue.
+///
+/// This function blocks until reading from `stream` returns either `Ok(0)` 
+/// or Err(...) as a result.
+///
 fn handle_output<R: Read>(stream_ty: StreamTy, mut stream: R, outbox: Sender<PacketTy>) -> Result<(), InternalError> {
 	'stdout: loop {
 		let mut buf = [0u8; 1024];
@@ -301,20 +321,3 @@ fn main() -> Result<(), InternalError> {
 	thread::sleep_ms(1000);
 	Ok(())
 }
-
-// fn read_packet() -> Result<Packet, InternalError> {
-// 	let mut stdin = io::stdin();
-// 
-// 	let mut len_buf = [0u8; 2];
-// 	let mut pkt_buf = vec![];
-// 
-// 	// read length
-// 	stdin.read_exact(&mut len_buf)?;
-// 	let len = (&len_buf[..]).read_u16::<NativeEndian>()?;
-// 	
-// 
-// 	stdin.read(&mut pkt_buf)?;
-// 
-// 	unreachable!()
-// 
-// }
