@@ -15,9 +15,26 @@ sub-projects which coordinate to accomplish this goal:
 
 ## Build Instructions
 
-Please see the `README` of each respective project for detailed
-build instructions. Note that `resin` will need to aditionally
-be installed on the system `PATH` in order for `lacca` to use it.
+You will need an Elixir toolchain (`mix`) and a Rust toolchain (`cargo`) to
+properly build this project. From the project directory run the following
+commands:
+
+1. `mix deps.get` -- download dependencies
+
+2. `mix deps.compile` -- compile dependences
+
+3. `mix compile` -- compiles `lacca` to the `_build/` directory.
+
+4. NOTE: the compile step will run `cargo build` on the `resin/` directory.
+   The artifacts from this build will be placed in `priv/resin/` which must
+   be deployed with the `lacca` OTP application.
+
+
+Since this project builds native code (a Rust executable), you will need to
+build this OTP application / release on the target platform. If you need to
+change how the `resind` executable is built you can modify the `Makefile`
+in this project directory.
+
 
 ## Protocol Versioning
 
