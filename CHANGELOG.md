@@ -4,6 +4,15 @@ The following is a list of official `shellac` releases, in reverse
 chronological order. These notes include both the client API (`lacca`)
 as well as the daemon process (`resin`), as they are versioned together.
 
+## Version: 0.1.1
+
+- `resin`: don't die immediately when inferior process dies
+
+- `lacca`: better handling of `resin` daemon shutting down.
+
+- `lacca`: add `alive?()` API method to test if inferior process
+  is still alive.
+
 
 ## Version: 0.1.0
 
