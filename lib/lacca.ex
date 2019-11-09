@@ -38,6 +38,10 @@ defmodule Lacca do
     GenServer.call(pid, :kill)
   end
 
+  def alive?(pid) do
+    GenServer.call(pid, :is_alive)
+  end
+
   @doc """
   Returns `{:ok, binary}` which includes any data received from the
   child's `stdout` file descriptor. _Note that the internal buffer is then 
@@ -145,6 +149,11 @@ defmodule Lacca do
     }}
   end
 
+  # check if the port is still open
+  def handle_call(:is_alive, _from, state) do
+    {:reply, state.is_alive, state}
+  end
+
   # reads the currently buffered `stdout` of the child process
   def handle_call(:read, _from, state = %{port: port}) when not is_nil(port) do
     buf = StringIO.flush(state.child_out)
@@ -167,6 +176,7 @@ defmodule Lacca do
     {:reply, :ok, state}
   end
 
+  # tell inferior process it's time *to die.*
   def handle_call(:kill, _from, state = %{port: port}) when not is_nil(port) do
     Encoder.write_exit_packet()
     |> Enum.map(fn packet ->
@@ -179,7 +189,7 @@ defmodule Lacca do
 
   # `resin` daemon exited, RIP us...
   def handle_info({port, {:exit_status, status}}, state) when is_port(port) do
-    Logger.debug "got exit: #{inspect status}"
+    Logger.debug "resin daemon hung-up w/ code: #{status}"
     {:noreply, state}
   end
 
@@ -190,9 +200,15 @@ defmodule Lacca do
     case decoded_data do
       {:ok, %{"DataOut" => %{"ty" => "Stdout", "buf" => buf }}, _} ->
         IO.write(state.child_out, buf)
+        {:noreply, state}
 
       {:ok, %{"DataOut" => %{"ty" => "Stderr", "buf" => buf}}, _} ->
         IO.write(state.child_err, buf)
+        {:noreply, state}
+
+      {:ok, %{"ExitStatus" => %{"code" => code}}, _} ->
+        Port.close(state.port)
+        {:noreply, %{state | exit_status: code}}
 
       packet ->
         Logger.warn "unhandled data packet: #{inspect packet}"
@@ -200,7 +216,6 @@ defmodule Lacca do
 
     {:noreply, state}
   end
-
 
   def handle_info({:DOWN, _ref, :port, port, reason}, state) when is_port(port) do
     Logger.debug "port going down: #{inspect port}"
