@@ -4,6 +4,12 @@ The following is a list of official `shellac` releases, in reverse
 chronological order. These notes include both the client API (`lacca`)
 as well as the daemon process (`resin`), as they are versioned together.
 
+## Version: 0.1.2
+
+- `lacca`: remove unimplemented `await()` from API, pending design.
+- `lacca`: remove unimplemented `stop_process()` (graceful shutdown) from API.
+- `lacca`: split `start()` and `start_link()` apart to give caller choice
+
 ## Version: 0.1.1
 
 - `resin`: don't die immediately when inferior process dies
