@@ -143,7 +143,7 @@ impl ResinServer {
 						match child.try_wait() {
 							Ok(Some(status_code)) => {
 								status_tx.send(PacketTy::ExitStatus { code: status_code.code() });
-								std::process::exit(0);
+								break; // no sense waiting for dead client; let main() cleanup ...
 							},
 
 							Ok(None) | Err(_) => {},
@@ -153,6 +153,8 @@ impl ResinServer {
 						// TODO: don't use sleep_ms
 						std::thread::sleep_ms(100);
 					}
+
+					Ok(())
 				});
 
 
@@ -177,7 +179,6 @@ impl ResinServer {
 
 				// transition to running state
 				self.state = ServerState::Started;
-
 				Ok(())
 			},
 
