@@ -127,7 +127,6 @@ defmodule Lacca do
     # TODO: negotiate protocol verison
     Encoder.write_start_process(path, args)
     |> Enum.map(fn packet ->
-      Logger.debug "sending packet: #{inspect packet}"
       Port.command(port, packet)
     end)
 
@@ -169,7 +168,6 @@ defmodule Lacca do
   def handle_call({:write, data}, _from, state = %{port: port}) when not is_nil(port) do
     Encoder.write_data_packet(data)
     |> Enum.map(fn packet ->
-      Logger.debug "sending packet: #{inspect packet}"
       Port.command(port, packet)
     end)
 
@@ -180,7 +178,6 @@ defmodule Lacca do
   def handle_call(:kill, _from, state = %{port: port}) when not is_nil(port) do
     Encoder.write_exit_packet()
     |> Enum.map(fn packet ->
-      Logger.debug "sending packet: #{inspect packet}"
       Port.command(port, packet)
     end)
 
@@ -231,7 +228,6 @@ defmodule Lacca do
 
       Encoder.write_exit_packet()
       |> Enum.map(fn packet ->
-        Logger.debug "sending packet: #{inspect packet}"
         Port.command(state.port, packet)
       end)
 

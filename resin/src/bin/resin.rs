@@ -151,7 +151,7 @@ impl ResinServer {
 
 						// TODO: how long to wait here?
 						// TODO: don't use sleep_ms
-						std::thread::sleep_ms(100);
+						std::thread::sleep_ms(10);
 					}
 
 					Ok(())
@@ -314,7 +314,7 @@ fn main() -> Result<(), InternalError> {
 		}
 	}
 
-	// stdin hungup, let's leave ...
+	// stdin hungup, let's leave ... wait a bit for inferior threads to clean up?
 	exit_tx.send(());
 	thread::sleep_ms(1000);
 	Ok(())
