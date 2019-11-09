@@ -38,7 +38,6 @@ defmodule Lacca do
     GenServer.call(pid, :kill)
   end
 
-
   @doc """
   Returns `{:ok, binary}` which includes any data received from the
   child's `stdout` file descriptor. _Note that the internal buffer is then 
@@ -78,7 +77,7 @@ defmodule Lacca do
 
   Use `await/1` if you wish to block on the child process actually terminating.
   """
-  def stop_child(pid) do
+  def stop_child(_pid) do
     {:error, :not_implemented}
   end
 
@@ -89,7 +88,7 @@ defmodule Lacca do
 
   When this function returns `pid` will have exited.
   """
-  def await(pid) do
+  def await(_pid) do
     {:error, :not_implemented}
   end
 
@@ -140,6 +139,9 @@ defmodule Lacca do
       child_err: p_child_err,
       child_out: p_child_out,
       child_in:  p_child_in,
+
+      is_alive: true,
+      exit_status: nil,
     }}
   end
 
@@ -177,7 +179,7 @@ defmodule Lacca do
 
   # `resin` daemon exited, RIP us...
   def handle_info({port, {:exit_status, status}}, state) when is_port(port) do
-    Logger.info "got exit: #{inspect status}"
+    Logger.debug "got exit: #{inspect status}"
     {:noreply, state}
   end
 
@@ -200,19 +202,26 @@ defmodule Lacca do
   end
 
 
-  def handle_info({:DOWN, ref, :port, port, reason}, state) when is_port(port) do
-    Logger.info "port going down: #{inspect port}"
-    Logger.info "got message of port leaving: #{inspect reason}"
-    Logger.info "port info: #{inspect Port.info(port)}"
-    {:noreply, state}
+  def handle_info({:DOWN, _ref, :port, port, reason}, state) when is_port(port) do
+    Logger.debug "port going down: #{inspect port}"
+    Logger.debug "got message of port leaving: #{inspect reason}"
+    Logger.debug "port info: #{inspect Port.info(port)}"
+
+    {:noreply, %{state | is_alive: false}}
   end
 
-  def terminate(_reason, state = %{port: port}) when is_port(port) do
-    Encoder.write_exit_packet()
-    |> Enum.map(fn packet ->
-      Logger.debug "sending packet: #{inspect packet}"
-      Port.command(port, packet)
-    end)
-  end
+  # if the port is alive: at least *try* to shut `resin` down cleanly.
+  def terminate(_reason, state) do
+    unless is_nil(state.port) do
 
+      Encoder.write_exit_packet()
+      |> Enum.map(fn packet ->
+        Logger.debug "sending packet: #{inspect packet}"
+        Port.command(state.port, packet)
+      end)
+
+      {:ok, :port_shutdown}
+
+    end
+  end
 end
