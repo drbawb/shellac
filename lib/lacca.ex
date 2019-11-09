@@ -8,14 +8,28 @@ defmodule Lacca do
   #
 
   @doc """
-  Starts a server which will run the executable located at `exec_path`
-  with the specified command line arguments. The returned handle, of the form
-  `{:ok, pid}`, can be used to interact w/ the program.
+  Starts the Lacca client without linking it to the caller's process.
+
+  See `start_link/2` for more information.
+  """
+  def start(exec_path, args) do
+    GenServer.start(__MODULE__, [path: exec_path, args: args])
+  end
+
+  @doc """
+  Starts a Lacca client process which will run the executable located at
+  `exec_path` with the specified command line arguments. The returned handle,
+  of the form `{:ok, pid}`.
+
+  The `pid` represents the `lacca` client, which communicates w/ a `resin`
+  daemon via an external `Port`. The program at `exec_path` is supervised
+  by this `resin` daemon, and is referred to as the `inferior` process.
 
   Note that `stdout` and `stderr` from the process are captured inside
   `StringIO` buffers internally. This data will remain in-memory until
   this server is either killed, or the buffers are flushed using the 
   respective API functions.
+
 
   ## Errors
 
@@ -24,9 +38,16 @@ defmodule Lacca do
   at `:resin, :daemon_path` can be used to force this process to run the
   daemon from a non-standard location.
   """
-  def start(exec_path, args)
+  def start_link(exec_path, args)
   when is_binary(exec_path) and is_list(args) do
     GenServer.start_link(__MODULE__, [path: exec_path, args: args])
+  end
+
+  @doc """
+  Returns `true` if the inferior process is alive, otherwise returns `false`.
+  """
+  def alive?(pid) do
+    GenServer.call(pid, :is_alive)
   end
 
   @doc """
@@ -38,10 +59,6 @@ defmodule Lacca do
     GenServer.call(pid, :kill)
   end
 
-  def alive?(pid) do
-    GenServer.call(pid, :is_alive)
-  end
-
   @doc """
   Returns `{:ok, binary}` which includes any data received from the
   child's `stdout` file descriptor. _Note that the internal buffer is then 
@@ -50,7 +67,6 @@ defmodule Lacca do
   def read_stdout(pid) do
     GenServer.call(pid, :read)
   end
-
 
   @doc """
   Returns `{:ok, binary}` which includes any data received from the
@@ -71,29 +87,6 @@ defmodule Lacca do
   """
   def write_stdin(pid, data) when is_binary(data) do
     GenServer.call(pid, {:write, data})
-  end
-
-
-  @doc """
-  Requests that the `resin` daemon send `SIGTERM` or equivalent to forcefully
-  terminate the running child process. This function returns immediately, and
-  the signal is sent asynchronously.
-
-  Use `await/1` if you wish to block on the child process actually terminating.
-  """
-  def stop_child(_pid) do
-    {:error, :not_implemented}
-  end
-
-  @doc """
-  Waits for the child process to exit, and returns a result struct which
-  includes the status code (if applicable), and any remaining data from the
-  `stdout` or `stderr` buffers for this process.
-
-  When this function returns `pid` will have exited.
-  """
-  def await(_pid) do
-    {:error, :not_implemented}
   end
 
   #
@@ -148,24 +141,29 @@ defmodule Lacca do
     }}
   end
 
-  # check if the port is still open
+  @doc false
   def handle_call(:is_alive, _from, state) do
+    # check if the port is still open
     {:reply, state.is_alive, state}
   end
 
-  # reads the currently buffered `stdout` of the child process
+  @doc false
   def handle_call(:read, _from, state = %{port: port}) when not is_nil(port) do
+    # reads the currently buffered `stdout` of the child process
     buf = StringIO.flush(state.child_out)
     {:reply, {:ok, buf}, state}
   end
 
-  # reads the currently buffered `stderr` of the child process
+  @doc false
   def handle_call(:read_err, _from, state = %{port: port}) when not is_nil(port) do
+    # reads the currently buffered `stderr` of the child process
     buf = StringIO.flush(state.child_err)
     {:reply, {:ok, buf}, state}
   end
 
+  @doc false
   def handle_call({:write, data}, _from, state = %{port: port}) when not is_nil(port) do
+    # writes some data to the `resin` port
     Encoder.write_data_packet(data)
     |> Enum.map(fn packet ->
       Port.command(port, packet)
@@ -174,8 +172,9 @@ defmodule Lacca do
     {:reply, :ok, state}
   end
 
-  # tell inferior process it's time *to die.*
+  @doc false
   def handle_call(:kill, _from, state = %{port: port}) when not is_nil(port) do
+    # tell inferior process it's time *to die.*
     Encoder.write_exit_packet()
     |> Enum.map(fn packet ->
       Port.command(port, packet)
@@ -184,14 +183,16 @@ defmodule Lacca do
     {:reply, :ok, state}
   end
 
-  # `resin` daemon exited, RIP us...
+  @doc false
   def handle_info({port, {:exit_status, status}}, state) when is_port(port) do
+    # `resin` daemon exited, RIP us...
     Logger.debug "resin daemon hung-up w/ code: #{status}"
     {:noreply, state}
   end
 
-  # handle packet received from `resin` daemon ...
+  @doc false
   def handle_info({port, {:data, data}}, state) when is_port(port) do
+    # handle packet received from `resin` daemon ...
     decoded_data = CBOR.decode(data)
 
     case decoded_data do
@@ -214,7 +215,9 @@ defmodule Lacca do
     {:noreply, state}
   end
 
+  @doc false
   def handle_info({:DOWN, _ref, :port, port, reason}, state) when is_port(port) do
+    # handle the `resin` port hanging up ...
     Logger.debug "port going down: #{inspect port}"
     Logger.debug "got message of port leaving: #{inspect reason}"
     Logger.debug "port info: #{inspect Port.info(port)}"
@@ -222,10 +225,10 @@ defmodule Lacca do
     {:noreply, %{state | is_alive: false}}
   end
 
-  # if the port is alive: at least *try* to shut `resin` down cleanly.
+  @doc false
   def terminate(_reason, state) do
+    # if the port is alive: at least *try* to shut `resin` down cleanly.
     unless is_nil(state.port) do
-
       Encoder.write_exit_packet()
       |> Enum.map(fn packet ->
         Port.command(state.port, packet)
