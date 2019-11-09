@@ -1,7 +1,6 @@
 use byteorder::{ReadBytesExt, WriteBytesExt, NetworkEndian};
 use resin::error::InternalError;
 use serde::{Deserialize, Serialize};
-use signal_hook::{iterator::Signals, SIGINT};
 use std::io::{self, Cursor, Read, Write};
 use std::thread;
 use std::process::{ChildStdin, Command, Stdio};
@@ -154,8 +153,6 @@ impl ResinServer {
 						// TODO: don't use sleep_ms
 						std::thread::sleep_ms(100);
 					}
-
-					Ok(())
 				});
 
 
