@@ -44,6 +44,23 @@ defmodule Lacca do
   end
 
   @doc """
+  Shuts down the Lacca client process and closes the underlying `resin` port.
+
+  Note that `resin` *will not* ask the child process to terminate when shutting down.
+  Calling this, without calling `kill/1` et al. first, is essentially the same as
+  just closing the `stdin` of the inferior process.
+
+  In the case that the inferior process does not exit upon reading EOF from
+  stdin it will continue running unsupervised in the background. If you need to
+  guarantee that the inferior process does not continue running: you *must* call
+  `kill/1`, or similar, and wait for `alive?/1` to return `false` before stopping
+  the Lacca client.
+  """
+  def stop(pid) do
+    GenServer.stop(pid)
+  end
+
+  @doc """
   Returns `true` if the inferior process is alive, otherwise returns `false`.
   """
   def alive?(pid) do
