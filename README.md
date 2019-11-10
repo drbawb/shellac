@@ -13,28 +13,45 @@ sub-projects which coordinate to accomplish this goal:
   onto the single BEAM port.
 
 
-## Build Instructions
+## Prerequisites
 
-You will need an Elixir toolchain (`mix`) and a Rust toolchain (`cargo`) to
-properly build this project. From the project directory run the following
-commands:
+You will need a Rust toolchain, which includes the build tool `cargo`, in
+order to sucesfully build this package. Please visit the Rust website for
+[instructions on how to install][rust-install] these tools. This library
+can be built with the "stable channel" of the Rust compiler.
 
-1. `mix deps.get` -- download dependencies
+[rust-install]: https://www.rust-lang.org/tools/install
 
-2. `mix deps.compile` -- compile dependences
+## Getting Started
 
-3. `mix compile` -- compiles `lacca` to the `_build/` directory.
+1. Add `{:lacca, "~> 0.1"}` to your `mix.exs` file's dependencies.
+2. Run `mix deps.get` to download the dependency.
+3. Run `mix deps.compile` to verify that the package compiles sucessfully.
+4. Use the library in your program, for instance ...
 
-4. NOTE: the compile step will run `cargo build` on the `resin/` directory.
-   The artifacts from this build will be placed in `priv/resin/` which must
-   be deployed with the `lacca` OTP application.
+```elixir
+{:ok, pid} = Lacca.start "echo", ["hello, world."]
+Lacca.read_stdout pid
+# {:ok, "hello, world.\n"}
+Lacca.stop pid
+```
 
+### Note on Native Code 
 
-Since this project builds native code (a Rust executable), you will need to
-build this OTP application / release on the target platform. If you need to
-change how the `resind` executable is built you can modify the `Makefile`
-in this project directory.
+This library builds a native executable which is bundled into the `priv/`
+directory of this OTP application during the `mix compile` phase. To do
+this you must have a working Rust toolchain installed on any machine that
+will be compiling a project that depends on `lacca`. You *do not* need the
+toolchain installed on deployment targets, however when building a release,
+e.g: with the `mix release` command, you will need to ensure that the resulting
+binaries can be executed on the target system.
 
+Some common gotchas include:
+
+- Building on Mac OS (mach) & deploying on Linux (ELF), etc.
+- Building on an x64 (64-bit) architecture and deploying on i686 (32-bit).
+- On Windows: Rust has two toolchains, GNU and MSVC, so care should be taken
+  to choose the correct one for your environment.
 
 ## Protocol Versioning
 
