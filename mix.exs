@@ -48,7 +48,7 @@ defmodule Lacca.MixProject do
         "resin/*.toml", "resin/*.lock", "resin/src/*"
       ],
 
-      licenses: ["BSD"],
+      licenses: ["BSD-3-Clause"],
       links: %{"GitHub" => "https://github.com/drbawb/shellac"},
     ]
   end
