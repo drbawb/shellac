@@ -7,6 +7,7 @@ defmodule Lacca do
   # API
   #
 
+  @spec start(String.t(), list(String.t())) :: GenServer.on_start()
   @doc """
   Starts the Lacca client without linking it to the caller's process.
 
@@ -16,6 +17,8 @@ defmodule Lacca do
     GenServer.start(__MODULE__, [path: exec_path, args: args])
   end
 
+
+  @spec start_link(String.t(), list(String.t())) :: GenServer.on_start()
   @doc """
   Starts a Lacca client process which will run the executable located at
   `exec_path` with the specified command line arguments. The returned handle,
@@ -43,6 +46,7 @@ defmodule Lacca do
     GenServer.start_link(__MODULE__, [path: exec_path, args: args])
   end
 
+  @spec stop(pid()) :: :ok
   @doc """
   Shuts down the Lacca client process and closes the underlying `resin` port.
 
@@ -60,6 +64,7 @@ defmodule Lacca do
     GenServer.stop(pid)
   end
 
+  @spec alive?(pid()) :: boolean()
   @doc """
   Returns `true` if the inferior process is alive, otherwise returns `false`.
   """
@@ -67,6 +72,7 @@ defmodule Lacca do
     GenServer.call(pid, :is_alive)
   end
 
+  @spec kill(pid()) :: :ok | {:error, String.t()}
   @doc """
   Attempts to terminate the process immediately. Caller should expect that
   the process will not be gracefully terminated; similarly to calling SIGKILL
@@ -76,6 +82,7 @@ defmodule Lacca do
     GenServer.call(pid, :kill)
   end
 
+  @spec read_stdout(pid()) :: {:ok, String.t()}
   @doc """
   Returns `{:ok, binary}` which includes any data received from the
   child's `stdout` file descriptor. _Note that the internal buffer is then 
@@ -85,6 +92,7 @@ defmodule Lacca do
     GenServer.call(pid, :read)
   end
 
+  @spec read_stderr(pid()) :: {:ok, String.t()}
   @doc """
   Returns `{:ok, binary}` which includes any data received from the
   child's `stderr` file descriptor. _Note that the internal buffer is then 
@@ -94,8 +102,10 @@ defmodule Lacca do
     GenServer.call(pid, :read_err)
   end
 
+  @spec write_stdin(pid(), String.t()) :: :ok | {:error, String.t()}
   @doc """
-  Returns `:ok` if the data has been sent to the underlying `resin` daemon.
+  Returns `:ok` once the data has been sent to the underlying `resin` daemon.
+
   Note that this function returns immediately after having sent the packet
   to the daemon, no guarantees as to the delivery to the child process are
   afforded. (i.e: the child may have closed its `stdin` prematurely, the child
