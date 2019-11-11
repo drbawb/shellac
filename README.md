@@ -149,13 +149,25 @@ following initialization sequence:
   - Should one daemon be able to handle multiple inferior processes?
     I think this is what `erlexec` does but I'm not sure.
 
-- lacca: explore stdout/stderr space
-  - with streams how do we signal EOF?
+  - Not sure this is actually desirable; reduces fault isolation, removes
+    1:1 mapping of erlang process -> os process which makes it harder to
+    structure OTP applications. there are arguments to be made about resource
+    efficiency though (less vm ports/memory/CPU/file descriptors used, et al.)
+
+- lacca: explore stdout/stderr API design space
+  - with streams how do we signal EOF? (separate packet type?)
   - what if user wants to stream by line?
   - should we send messages to interested processes instead of a
     buffer that is read-once? (`flush()` destroys the contents of the
     buffer...)
 
-- packaging (hex.pm): how do we distribute both halves effectively?
-  distribute source and call `cargo` from Mix?
+- shellac: lightweight protocol
+  - once the protocol is relatively stable I'd like to design a custom
+    wire format. we have pretty straightforward types (integer sizes, byte lists)
+    and CBOR seems to have a fair bit of overhead since rust enums get encoded
+    as dictionaries.
+
+  - this will be a major breaking change so probably do it before 1.0
+
+
 

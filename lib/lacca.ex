@@ -27,8 +27,8 @@ defmodule Lacca do
 
   Note that `stdout` and `stderr` from the process are captured inside
   `StringIO` buffers internally. This data will remain in-memory until
-  this server is either killed, or the buffers are flushed using the 
-  respective API functions.
+  this server is either stopped, or the buffers are flushed using the 
+  respective API functions: `read_stdout/1` and `read_stderr/1`.
 
 
   ## Errors
@@ -110,6 +110,7 @@ defmodule Lacca do
   # Callbacks
   #
 
+  @doc false
   def init(opts) do
     Logger.debug "opening port" 
     {path, _} = Keyword.pop(opts, :path)
