@@ -4,6 +4,13 @@ The following is a list of official `shellac` releases, in reverse
 chronological order. These notes include both the client API (`lacca`)
 as well as the daemon process (`resin`), as they are versioned together.
 
+## Version: 0.1.4
+
+- `lacca`: improved documentation
+- `lacca`: added dialyzer `@spec` declarations
+- `resin`: added license specifier to package manifest
+
+
 ## Version: 0.1.3
 
 - `lacca`: add API (`stop/1`) to stop the Lacca client process.
