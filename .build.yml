@@ -1,0 +1,15 @@
+image: archlinux
+packages:
+    - elixir
+    - rust
+sources:
+    - https://git.sr.ht/~hime/shellac
+tasks:
+    - setup: |
+        mix local.hex --force
+    - build: |
+        cd shellac
+        mix deps.get
+        mix deps.compile
+        mix test
+
