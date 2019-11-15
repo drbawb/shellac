@@ -154,6 +154,7 @@ following initialization sequence:
     structure OTP applications. there are arguments to be made about resource
     efficiency though (less vm ports/memory/CPU/file descriptors used, et al.)
 
+
 - lacca: explore stdout/stderr API design space
   - with streams how do we signal EOF? (separate packet type?)
   - what if user wants to stream by line?
@@ -169,5 +170,17 @@ following initialization sequence:
 
   - this will be a major breaking change so probably do it before 1.0
 
+- shellac: error reporting
+  - internally resin has multiple threads coordinating to manage the process.
+    this means that currently a request, and errors resulting from that request,
+    happen asynchronously.
 
+    - for e.g: resin accepts input, passes input to the child, and then encounters
+      an error. -- the client process has already moved on, since it sucesfully wrote
+      the data to the port.
 
+  - only way I can see to fix this is to either enforce synchrony, or have the client
+    provide a coorleation ID for errors. (basically tag each requests with a unique ID)
+
+  - that raises the question of what do we use for request IDs, how do we serialize it
+    on the wire, is it part of packet header or packet itself? etc...
