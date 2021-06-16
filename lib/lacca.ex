@@ -151,6 +151,7 @@ defmodule Lacca do
       Port.command(port, packet)
     end)
 
+
     # open IO streams
     {:ok, p_child_err} = StringIO.open("")
     {:ok, p_child_out} = StringIO.open("")
@@ -221,18 +222,18 @@ defmodule Lacca do
   @doc false
   def handle_info({port, {:data, data}}, state) when is_port(port) do
     # handle packet received from `resin` daemon ...
-    decoded_data = CBOR.decode(data)
+    decoded_data = Msgpax.unpack(data)
 
     case decoded_data do
-      {:ok, %{"DataOut" => %{"ty" => "Stdout", "buf" => buf }}, _} ->
+      {:ok, %{"DataOut" => %{"ty" => %{"Stdout" => _}, "buf" => buf}}} ->
         IO.write(state.child_out, buf)
         {:noreply, state}
 
-      {:ok, %{"DataOut" => %{"ty" => "Stderr", "buf" => buf}}, _} ->
+      {:ok, %{"DataOut" => %{"ty" => %{"Stderr" => _}, "buf" => buf}}}->
         IO.write(state.child_err, buf)
         {:noreply, state}
 
-      {:ok, %{"ExitStatus" => %{"code" => code}}, _} ->
+      {:ok, %{"ExitStatus" => %{"code" => code}}} ->
         Port.close(state.port)
         {:noreply, %{state | exit_status: code}}
 

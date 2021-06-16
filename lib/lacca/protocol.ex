@@ -6,7 +6,7 @@ defmodule Lacca.Protocol do
 
   - u16       packet length (i.e: read next `n` bytes)
   - u8        packet flags
-  - [u8,...]  packet payload (CBOR encoded)
+  - [u8,...]  packet payload (MsgPack encoded)
 
   NOTE: if the high bit (0x80) of the packet flags are set this message
   is *incomplete* and the payload must be buffered by the receiver.
@@ -104,7 +104,7 @@ defmodule Lacca.Protocol do
       data_packet = %{"DataIn" => %{"buf" => :erlang.binary_to_list(data)}}
 
       # encode the payload and split it into wire packets
-      packet_bin  = CBOR.encode(data_packet)
+      packet_bin  = Msgpax.pack!(data_packet, [iodata: false])
       packet_list = BinUtils.chunk_binary(packet_bin, @max_payload_size)
                     |> _serialize_packets(start_process())
     end
@@ -113,7 +113,7 @@ defmodule Lacca.Protocol do
       data_packet = %{"KillProcess" => nil}
 
       # encode the payload and split it into wire packets
-      packet_bin  = CBOR.encode(data_packet)
+      packet_bin  = Msgpax.pack!(data_packet, [iodata: false])
       packet_list = BinUtils.chunk_binary(packet_bin, @max_payload_size)
                     |> _serialize_packets(start_process())
     end
@@ -128,7 +128,7 @@ defmodule Lacca.Protocol do
 
 
       # encode the payload and split it into wire packets
-      packet_bin  = CBOR.encode(start_process_packet)
+      packet_bin  = Msgpax.pack!(start_process_packet, [iodata: false])
       packet_list = BinUtils.chunk_binary(packet_bin, @max_payload_size)
                     |> _serialize_packets(start_process())
     end
