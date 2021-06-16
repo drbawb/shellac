@@ -215,9 +215,9 @@ impl ResinServer {
 			msg: format!("resin daemon error: {}", error)
 		};
 
-        let buf = ResinServer::packet_to_vec(packet)?;
+		let buf = ResinServer::packet_to_vec(packet)?;
 
-        let mut erlang_port = io::stdout();
+		let mut erlang_port = io::stdout();
 		erlang_port.write_u16::<NetworkEndian>(buf.len() as u16)?;
 		erlang_port.write(&buf)?;
 		erlang_port.flush()?;
@@ -225,16 +225,16 @@ impl ResinServer {
 		Ok(())
 	}
 
-    fn packet_to_vec(packet: PacketTy) -> Result<Vec<u8>, InternalError> {
-        let mut buf = Vec::with_capacity(128);
-        let mut serializer = rmp_serde::Serializer::new(&mut buf)
-            .with_string_variants()
-            .with_struct_map();
-      
-        packet.serialize(&mut serializer)?;
+	fn packet_to_vec(packet: PacketTy) -> Result<Vec<u8>, InternalError> {
+		let mut buf = Vec::with_capacity(128);
+		let mut serializer = rmp_serde::Serializer::new(&mut buf)
+			.with_string_variants()
+			.with_struct_map();
 
-        Ok(buf)
-    }
+		packet.serialize(&mut serializer)?;
+
+		Ok(buf)
+	}
 
 }
 
