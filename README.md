@@ -26,7 +26,7 @@ can be built with the "stable channel" of the Rust compiler.
 
 ## Getting Started
 
-1. Add `{:lacca, "~> 0.1"}` to your `mix.exs` file's dependencies.
+1. Add `{:lacca, "~> 0.2"}` to your `mix.exs` file's dependencies.
 2. Run `mix deps.get` to download the dependency.
 3. Run `mix deps.compile` to verify that the package compiles sucessfully.
 4. Use the library in your program, for instance ...
@@ -57,42 +57,24 @@ Some common gotchas include:
 
 ## Protocol Versioning
 
-The `lacca` and `resin` programs *do not* follow standard semantic versioning
-guideliens. Please read the following to understand how the project's versions
-are controlled. *The developer's suggest pinning both a major AND minor version*
-when using build tools which expect semantic versioning. i.e: pin to
-"\~> 1.3.0" rather than "\~> 1.3" in your build tool. This would allow the patch
-version to change, but not the major or minor version.
+Please note that this is alpha-quality software. There are plans to introduce
+backwards compatibility to the `resin` daemon at a later date; for example it
+would be possible to use a newer `resin` binary w/ an older `lacca` binary.
 
-The version number consits of `protocol`, `library`, and `patch` components.
-Their significance to the project is as follows:
+However this functionality is not implemented in the prototype `v0`. For best
+results it is *strongly encouraged* that you use matching versions of `resin`
+and `lacca` which were compiled together from the same sources. (This would be
+the default behavior if you are using `mix` to fetch your dependencies, as it
+will build `resin` from source for the current architecture.)
 
-- `protocol` will whenever the protocol between `lacca` and `resin` are
-  changed in non-backwards compatible ways. Newer major versions of `resin` 
-  will work with older versions of `lacca`, but not vice versa.
 
-- `minor` will be changed to reflect *breaking changes* to the program's API.
-  - Such changes for `lacca` might include:
-    - Removed functions
-    - Change of non-optional arguments to a function
-    - Change in return value from a function
-
-  - Such changes to `resin` might include:
-    - Command line options renamed or removed
-    - Change in interpretation of command line arguments
-
-- `patch` will be changed when backwards-compatible changes are introduced
-  to either the protocol, library, or daemon.
-
-NOTE: `v0` of the protocol is considered unstable. For best results 
-you should always build and deploy the `v0` programs together.
 
 ## Protocol Format
 
 `shellac` v0 packets are sent on the wire as follows:
 
 - (n) 		two bytes identifying packet length
-- (data)	packet specific data (n bytes, CBOR encoded)
+- (data)	packet specific data (n bytes, MsgPack encoded)
 
 ### Packet Types
 
@@ -100,15 +82,19 @@ Packet types are as follows:
 
 **TBD**
 
-1. Start Process 	(exec: string, args: [string]])
-2. Stop Process 	()
-3. DataOut 			(ty: (Stdout | Stderr), buf: [u8])
-5. DataIn 			(buf: [u8])
+```
+1. Start Process  :: (exec: string, args: [string]])
+2. Kill Process   :: ()
+3. DataOut        :: (ty: (Stdout | Stderr), buf: [u8])
+4. DataIn         :: (buf: [u8])
+5. ExitStatus     :: ( u32? )
+6. ErrorReport    :: (string)
+```
 
 ### Future Additions
 
 - POSIX signal support?
-- windows support?
+- Windows support?
 - Standard stream redirection?
 - Buffered input mode?
 
@@ -178,11 +164,20 @@ following initialization sequence:
     happen asynchronously.
 
     - for e.g: resin accepts input, passes input to the child, and then encounters
-      an error. -- the client process has already moved on, since it sucesfully wrote
-      the data to the port.
+      an error. The `lacca` process would have already moved on, since it 
+      succesfully wrote the data to the port.
 
   - only way I can see to fix this is to either enforce synchrony, or have the client
     provide a coorleation ID for errors. (basically tag each requests with a unique ID)
 
   - that raises the question of what do we use for request IDs, how do we serialize it
     on the wire, is it part of packet header or packet itself? etc...
+
+- port driver
+  - it may be interesting to use an actual port driver instead of starting a
+    background daemon. see: https://erlang.org/doc/tutorial/c_portdriver.html
+  - a disadvantage of this is that `resin` becomes less useful from a calling
+    context other than erlang.
+
+
+
