@@ -6,6 +6,7 @@ use std::thread;
 use std::process::{ChildStdin, Command, Stdio};
 use std::sync::mpsc::{channel, Sender, Receiver};
 
+
 /// StreamTy represents which standard file-descriptor a data packet
 /// was read from. This is necessary to multiplex multiple descriptors
 /// onto the single stream available for sending data back to the Erlang VM.
@@ -164,7 +165,8 @@ impl ResinServer {
 					loop {
 						match outbox_rx.recv() {
 							Ok(packet) => {
-								let buf = serde_cbor::to_vec(&packet)?;
+								let buf = ResinServer::packet_to_vec(packet)?;
+
 								erlang_port.write_u16::<NetworkEndian>(buf.len() as u16)?;
 								erlang_port.write(&buf)?;
 								erlang_port.flush()?;
@@ -213,15 +215,27 @@ impl ResinServer {
 			msg: format!("resin daemon error: {}", error)
 		};
 
-		let buf = serde_cbor::to_vec(&packet)?;
-		
-		let mut erlang_port = io::stdout();
+        let buf = ResinServer::packet_to_vec(packet)?;
+
+        let mut erlang_port = io::stdout();
 		erlang_port.write_u16::<NetworkEndian>(buf.len() as u16)?;
 		erlang_port.write(&buf)?;
 		erlang_port.flush()?;
 
 		Ok(())
 	}
+
+    fn packet_to_vec(packet: PacketTy) -> Result<Vec<u8>, InternalError> {
+        let mut buf = Vec::with_capacity(128);
+        let mut serializer = rmp_serde::Serializer::new(&mut buf)
+            .with_string_variants()
+            .with_struct_map();
+      
+        packet.serialize(&mut serializer)?;
+
+        Ok(buf)
+    }
+
 }
 
 
@@ -239,7 +253,7 @@ fn decode_packets(packets: Vec<Vec<u8>>) -> Result<PacketTy, InternalError> {
 		.map(|byte| *byte)
 		.collect::<Vec<_>>();
 
-	let decoded_packet = serde_cbor::from_reader(&complete_buf[..])?;
+	let decoded_packet = rmp_serde::from_read_ref(&complete_buf[..])?;
 
 	Ok(decoded_packet)
 }

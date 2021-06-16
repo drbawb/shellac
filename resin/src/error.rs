@@ -7,7 +7,10 @@ pub enum InternalError {
 	IoError { inner: io::Error },
 
 	#[fail(display = "fail serializing payload: {}", inner)]
-	SerializerError { inner: serde_cbor::error::Error },
+	SerializerError { inner: rmp_serde::encode::Error },
+
+	#[fail(display = "fail serializing payload: {}", inner)]
+	DeserializerError { inner: rmp_serde::decode::Error },
 
 	#[fail(display = "unknown packet type: {}", ty)]
 	UnknownType { ty: u8 },
@@ -19,8 +22,14 @@ impl From<io::Error> for InternalError {
 	}
 }
 
-impl From<serde_cbor::error::Error> for InternalError {
-	fn from(error: serde_cbor::error::Error) -> Self {
+impl From<rmp_serde::encode::Error> for InternalError {
+	fn from(error: rmp_serde::encode::Error) -> Self {
 		InternalError::SerializerError { inner: error }
+	}
+}
+
+impl From<rmp_serde::decode::Error> for InternalError {
+	fn from(error: rmp_serde::decode::Error) -> Self {
+		InternalError::DeserializerError { inner: error }
 	}
 }
