@@ -1,5 +1,7 @@
 # shellac
 
+[![builds.sr.ht status](https://builds.sr.ht/~hime/shellac.svg)](https://builds.sr.ht/~hime/shellac?)
+
 `shellac` is a suite of software which aims to provides OS-level 
 process control for the Elixir language. The software is composed of two
 sub-projects which coordinate to accomplish this goal:
