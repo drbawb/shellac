@@ -4,7 +4,7 @@ defmodule Lacca.MixProject do
   def project do
     [
       app: :lacca,
-      version: "0.1.4",
+      version: "0.1.5",
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -33,9 +33,9 @@ defmodule Lacca.MixProject do
   defp deps do
     [
       {:cbor, "~> 1.0"},
-      {:dialyxir, "~> 1.0.0-rc.7", only: [:dev], runtime: false},
+      {:dialyxir, "~> 1.0", only: [:dev], runtime: false},
       {:elixir_make, "~> 0.4", runtime: false},
-      {:ex_doc, "~> 0.19.0", only: :dev, runtime: :false},
+      {:ex_doc, "~> 0.24.0", only: :dev, runtime: :false},
     ]
   end
 
