@@ -2,9 +2,44 @@ use byteorder::{ReadBytesExt, WriteBytesExt, NetworkEndian};
 use resin::error::InternalError;
 use serde::{Deserialize, Serialize};
 use std::io::{self, Cursor, Read, Write};
+
 use std::thread;
 use std::process::{ChildStdin, Command, Stdio};
 use std::sync::mpsc::{channel, Sender, Receiver};
+
+#[cfg(unix)]
+mod platform {
+	use std::fs::File;
+	use std::io;
+	use std::os::unix::io::{AsRawFd, FromRawFd};
+
+	pub fn stdin_as_fd() -> File {
+		let stdin_handle = io::stdin().as_raw_fd();
+		unsafe { File::from_raw_fd(stdin_handle) }
+	}
+
+	pub fn stdout_as_fd() -> File {
+		let stdout_handle = io::stdout().as_raw_fd();
+		unsafe { File::from_raw_fd(stdout_handle) }
+	}
+}
+
+#[cfg(windows)]
+mod platform {
+	use std::fs::File;
+	use std::io;
+	use std::os::windows::io::{AsRawHandle, FromRawHandle};
+
+	pub fn stdin_as_fd() -> File {
+		let stdin_handle = io::stdin().as_raw_handle();
+		unsafe { File::from_raw_handle(stdin_handle) }
+	}
+
+	pub fn stdout_as_fd() -> File {
+		let stdout_handle = io::stdout().as_raw_handle();
+		unsafe { File::from_raw_handle(stdout_handle) }
+	}
+}
 
 /// StreamTy represents which standard file-descriptor a data packet
 /// was read from. This is necessary to multiplex multiple descriptors
@@ -159,7 +194,7 @@ impl ResinServer {
 
 
 				let _outgoing_thread: thread::JoinHandle<Result<(), InternalError>> = thread::spawn(move || {
-					let mut erlang_port = io::stdout();
+					let mut erlang_port = platform::stdout_as_fd();
 
 					loop {
 						match outbox_rx.recv() {
@@ -271,9 +306,10 @@ fn handle_output<R: Read>(stream_ty: StreamTy, mut stream: R, outbox: Sender<Pac
 
 
 fn main() -> Result<(), InternalError> {
-	let mut stdin = io::stdin();
-	let mut packet_chain = vec![];
+    let mut stdin = platform::stdin_as_fd();
+    let mut packet_chain = vec![];
 	let mut server = ResinServer::new();
+
 
 	let exit_tx = server.exit_tx
 		.clone()
