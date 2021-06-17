@@ -1,6 +1,6 @@
 [package]
 name = "resin"
-version = "0.1.5"
+version = "0.1.7"
 authors = ["drbawb <drbawb@fatalsyntax.com>"]
 edition = "2018"
 license = "BSD-3-Clause"
