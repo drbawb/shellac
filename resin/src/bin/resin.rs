@@ -3,7 +3,9 @@ use resin::error::InternalError;
 use serde::{Deserialize, Serialize};
 use std::io::{self, Cursor, Read, Write};
 
+
 use std::thread;
+use std::time::Duration;
 use std::process::{ChildStdin, Command, Stdio};
 use std::sync::mpsc::{channel, Sender, Receiver};
 
@@ -185,8 +187,7 @@ impl ResinServer {
 						}
 
 						// TODO: how long to wait here?
-						// TODO: don't use sleep_ms
-						std::thread::sleep_ms(10);
+						thread::sleep(Duration::from_millis(10));
 					}
 
 					Ok(())
@@ -365,6 +366,6 @@ fn main() -> Result<(), InternalError> {
 
 	// stdin hungup, let's leave ... wait a bit for inferior threads to clean up?
 	exit_tx.send(());
-	thread::sleep_ms(1000);
+	thread::sleep(Duration::from_millis(1000));
 	Ok(())
 }
