@@ -12,6 +12,9 @@ pub enum InternalError {
 	#[fail(display = "fail serializing payload: {}", inner)]
 	DeserializerError { inner: rmp_serde::decode::Error },
 
+	#[fail(display = "channel transmit error; internal channel closed?")]
+	ChannelSendError,
+
 	#[fail(display = "unknown packet type: {}", ty)]
 	UnknownType { ty: u8 },
 }

@@ -179,14 +179,22 @@ impl ResinServer {
 
 						match child.try_wait() {
 							Ok(Some(status_code)) => {
-								status_tx.send(PacketTy::ExitStatus { code: status_code.code() });
-								break; // no sense waiting for dead client; let main() cleanup ...
+								// not much we can do with this error if our channel to write
+								// packets to the client has gone away ...
+								let _err = status_tx.send(PacketTy::ExitStatus { code: status_code.code() });
+
+								// no sense waiting for dead client; let main() cleanup ...
+								break;
 							},
 
+							// TODO: handle the Ok(None) case better
+							// According to the stdlib docs this just means that
+							// the status code is not *yet* available, and per their
+							// example we are expected to call #wait() after this.
 							Ok(None) | Err(_) => {},
 						}
 
-						// TODO: how long to wait here?
+						// TODO: how long to wait here? worth making this event driven?
 						thread::sleep(Duration::from_millis(10));
 					}
 
@@ -235,7 +243,12 @@ impl ResinServer {
 			},
 
 			PacketTy::KillProcess => {
-				if let Some(tx) = &self.exit_tx { tx.send(()); }
+				if let Some(tx) = &self.exit_tx { 
+					if let Err(_data) = tx.send(()) {
+						self.dispatch_error(InternalError::ChannelSendError)?;
+					}
+				}
+
 				Ok(())
 			},
 
@@ -365,7 +378,7 @@ fn main() -> Result<(), InternalError> {
 	}
 
 	// stdin hungup, let's leave ... wait a bit for inferior threads to clean up?
-	exit_tx.send(());
+	let _err = exit_tx.send(());
 	thread::sleep(Duration::from_millis(1000));
 	Ok(())
 }
