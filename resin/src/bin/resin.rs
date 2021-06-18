@@ -57,31 +57,31 @@ pub enum StreamTy {
 /// on the wire.
 #[derive(Debug, Deserialize, Serialize)]
 pub enum PacketTy {
-	/// Sent by a `shellac` client to request that the daemon starts
+	/// Sent by a client to request that the daemon starts
 	/// the named executable. If this daemon is already running an
 	/// executable: this command will be ignored and an error code
 	/// will be returned to the client.
 	StartProcess { exec: String, args: Vec<String> },
 
-	/// Sent by a `shellac` client to request that the daemon stops
+	/// Sent by a client to request that the daemon stops
 	/// the child process immediately.
 	KillProcess,
 
-	/// Data to be sent to a `shellac` client representing data
+	/// Data to be sent to a client representing data
 	/// received from the child's output descriptor(s).
 	DataOut { ty: StreamTy, buf: Vec<u8> },
 
 
-	/// Data received from a `shellac` client representing data
+	/// Data received from a  client representing data
 	/// which needs to be sent to the child program on its standard
 	/// input descriptor.
 	DataIn { buf: Vec<u8> },
 
-	/// Indicates to a `shellac` client that the daemon will exit
+	/// Indicates to a client that the daemon will exit
 	/// because the child has hung-up & returned an exit status.
 	///
 	/// NOTE: an exit status is not available on all platforms in
-	/// all instances of abnormal termination. The `shellac` client
+	/// all instances of abnormal termination. The client
 	/// must be able to handle the absence of an exit code.
 	ExitStatus { code: Option<i32> },
 
