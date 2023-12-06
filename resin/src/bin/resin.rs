@@ -276,7 +276,6 @@ impl ResinServer {
 	fn packet_to_vec(packet: PacketTy) -> Result<Vec<u8>, InternalError> {
 		let mut buf = Vec::with_capacity(128);
 		let mut serializer = rmp_serde::Serializer::new(&mut buf)
-			.with_string_variants()
 			.with_struct_map();
 
 		packet.serialize(&mut serializer)?;
@@ -301,7 +300,7 @@ fn decode_packets(packets: Vec<Vec<u8>>) -> Result<PacketTy, InternalError> {
 		.map(|byte| *byte)
 		.collect::<Vec<_>>();
 
-	let decoded_packet = rmp_serde::from_read_ref(&complete_buf[..])?;
+	let decoded_packet = rmp_serde::from_slice(&complete_buf[..])?;
 
 	Ok(decoded_packet)
 }
