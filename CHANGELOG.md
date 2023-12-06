@@ -1,48 +1,5 @@
-# Project `shellac` Change Log
+# shellac v0.2.2
 
-The following is a list of official `shellac` releases, in reverse
-chronological order. These notes include both the client API (`lacca`)
-as well as the daemon process (`resin`), as they are versioned together.
-
-## Version: 0.1.4
-
-- `lacca`: improved documentation
-- `lacca`: added dialyzer `@spec` declarations
-- `resin`: added license specifier to package manifest
-
-
-## Version: 0.1.3
-
-- `lacca`: add API (`stop/1`) to stop the Lacca client process.
-
-## Version: 0.1.2
-
-- `lacca`: remove unimplemented `await()` from API, pending design.
-- `lacca`: remove unimplemented `stop_process()` (graceful shutdown) from API.
-- `lacca`: split `start()` and `start_link()` apart to give caller choice
-
-## Version: 0.1.1
-
-- `resin`: don't die immediately when inferior process dies
-
-- `lacca`: better handling of `resin` daemon shutting down.
-
-- `lacca`: add `alive?()` API method to test if inferior process
-  is still alive.
-
-
-## Version: 0.1.0
-
-Initial release. This includes the following core functionality:
-
-- `mix.exs` is setup to build this as a package suitable for inclusion
-  from the `hex.pm` package repository
-
-- `mix compile` is able to build the requisite `resin` daemon and include
-  it in the `priv/` directory of the `lacca` OTP application.
-
-- `lacca` core API allows for:
-  - starting a process (by relative or absolute path) w/ arguments.
-  - terminating a process (`SIGKILL` effectively)
-  - polling for `stdout` / `stderr` which are internally buffered
-  - writing to `stdin`
+- `resin` daemon is updated (0.3.0) to use latest msgpack serializer
+- `lacca` client is updated (0.2.2) to handle encoding differences 
+- `lacca` client has a test-case for stderr communication now
