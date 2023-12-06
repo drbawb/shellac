@@ -17,6 +17,7 @@ build:
 	@cp resin/target/release/resin priv/resin/resind
 	@cp resin/target/release/test_child priv/resin/test_child
 	@cp resin/target/release/test_echo priv/resin/test_echo
+	@cp resin/target/release/test_err priv/resin/test_err
 
 clean:
 	@$(CARGO) clean $(CARGO_OPTS)

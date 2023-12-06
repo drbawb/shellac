@@ -225,11 +225,11 @@ defmodule Lacca do
     decoded_data = Msgpax.unpack(data)
 
     case decoded_data do
-      {:ok, %{"DataOut" => %{"ty" => %{"Stdout" => _}, "buf" => buf}}} ->
+      {:ok, %{"DataOut" => %{"ty" => "Stdout", "buf" => buf}}} ->
         IO.write(state.child_out, buf)
         {:noreply, state}
 
-      {:ok, %{"DataOut" => %{"ty" => %{"Stderr" => _}, "buf" => buf}}}->
+      {:ok, %{"DataOut" => %{"ty" => "Stderr", "buf" => buf}}} ->
         IO.write(state.child_err, buf)
         {:noreply, state}
 
