@@ -1,21 +1,21 @@
-use failure::Fail;
+use thiserror::Error;
 use std::io;
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum InternalError {
-	#[fail(display = "internal io error: {}", inner)]
+	#[error("internal io error: {inner:?}")]
 	IoError { inner: io::Error },
 
-	#[fail(display = "fail serializing payload: {}", inner)]
+	#[error("fail serializing payload: {inner:?}")]
 	SerializerError { inner: rmp_serde::encode::Error },
 
-	#[fail(display = "fail serializing payload: {}", inner)]
+	#[error("fail serializing payload: {inner:?}")]
 	DeserializerError { inner: rmp_serde::decode::Error },
 
-	#[fail(display = "channel transmit error; internal channel closed?")]
+	#[error("channel transmit error; internal channel closed?")]
 	ChannelSendError,
 
-	#[fail(display = "unknown packet type: {}", ty)]
+	#[error("unknown packet type: {}", ty)]
 	UnknownType { ty: u8 },
 }
 
