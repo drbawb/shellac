@@ -230,7 +230,7 @@ defmodule Lacca do
   def handle_info({port, {:exit_status, status}}, state) when is_port(port) do
     # `resin` daemon exited, RIP us...
     Logger.debug "resin daemon hung-up w/ code: #{status}"
-    {:noreply, %{state | exit_status: status}}
+    {:noreply, state}
   end
 
   @doc false
@@ -249,13 +249,14 @@ defmodule Lacca do
 
       {:ok, %{"ExitStatus" => %{"code" => code}}} ->
         Port.close(state.port)
+        Logger.debug "apply status: #{inspect code}"
         {:noreply, %{state | exit_status: code}}
 
       packet ->
-        Logger.warn "unhandled data packet: #{inspect packet}"
+        Logger.warning "unhandled data packet: #{inspect packet}"
+        {:noreply, state}
     end
 
-    {:noreply, state}
   end
 
   @doc false
