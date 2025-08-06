@@ -187,11 +187,17 @@ impl ResinServer {
 								break;
 							},
 
-							// TODO: handle the Ok(None) case better
-							// According to the stdlib docs this just means that
-							// the status code is not *yet* available, and per their
-							// example we are expected to call #wait() after this.
-							Ok(None) | Err(_) => {},
+							Ok(None) => if let Ok(status_code) = child.wait() {
+								// not much we can do with this error if our channel to write
+								// packets to the client has gone away ...
+								let _err = status_tx.send(PacketTy::ExitStatus { code: status_code.code() });
+
+								// no sense waiting for dead client; let main() cleanup ...
+								break;
+                            },
+
+                            // TODO: what to do with this?
+                            Err(_) => {},
 						}
 
 						// TODO: how long to wait here? worth making this event driven?
