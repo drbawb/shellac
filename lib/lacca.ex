@@ -72,6 +72,15 @@ defmodule Lacca do
     GenServer.call(pid, :is_alive)
   end
 
+  @spec status(pid()) :: integer()
+  @doc """
+  Returns the exit status as an integer if the process has exited and one was
+  provided, otherwise returns `nil`.
+  """
+  def status(pid) do
+    GenServer.call(pid, :exit_status) 
+  end
+
   @spec kill(pid()) :: :ok | {:error, String.t()}
   @doc """
   Attempts to terminate the process immediately. Caller should expect that
@@ -177,6 +186,11 @@ defmodule Lacca do
   end
 
   @doc false
+  def handle_call(:exit_status, _from, state) do
+    {:reply, Map.get(state, :exit_status), state}
+  end
+
+  @doc false
   def handle_call(:read, _from, state = %{port: port}) when not is_nil(port) do
     # reads the currently buffered `stdout` of the child process
     buf = StringIO.flush(state.child_out)
@@ -216,7 +230,7 @@ defmodule Lacca do
   def handle_info({port, {:exit_status, status}}, state) when is_port(port) do
     # `resin` daemon exited, RIP us...
     Logger.debug "resin daemon hung-up w/ code: #{status}"
-    {:noreply, state}
+    {:noreply, %{state | exit_status: status}}
   end
 
   @doc false
